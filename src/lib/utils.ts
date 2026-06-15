@@ -56,6 +56,8 @@ export function getSplitColor(split: string): string {
     upper: "text-orange-400",
     lower: "text-yellow-400",
     full_body: "text-pink-400",
+    biceps: "text-lime-400",
+    triceps: "text-amber-400",
     custom: "text-gray-400",
   };
   return colors[split] || "text-gray-400";
@@ -69,6 +71,8 @@ export function getSplitBg(split: string): string {
     upper: "bg-orange-400/10 text-orange-400 border-orange-400/20",
     lower: "bg-yellow-400/10 text-yellow-400 border-yellow-400/20",
     full_body: "bg-pink-400/10 text-pink-400 border-pink-400/20",
+    biceps: "bg-lime-400/10 text-lime-400 border-lime-400/20",
+    triceps: "bg-amber-400/10 text-amber-400 border-amber-400/20",
     custom: "bg-gray-400/10 text-gray-400 border-gray-400/20",
   };
   return colors[split] || "bg-gray-400/10 text-gray-400 border-gray-400/20";

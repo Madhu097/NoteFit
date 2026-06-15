@@ -4,14 +4,15 @@ import { useState } from "react";
 import { useAuth } from "@/providers/AuthProvider";
 import { useWorkouts } from "@/hooks/useWorkouts";
 import { useProgress } from "@/hooks/useProgress";
-import { updateUserProfile, logOut } from "@/lib/firebase/auth";
+import { updateUserProfile, logOut, sendAdminPasswordReset } from "@/lib/firebase/auth";
 import { useRouter } from "next/navigation";
 import {
   User, Scale, Target, Calendar, Dumbbell, TrendingUp,
-  LogOut, Edit3, Save, X, Flame
+  LogOut, Edit3, Save, X, Flame, ShieldAlert, Key
 } from "lucide-react";
 import { cn, calculateStreak, formatVolume } from "@/lib/utils";
 import { toast } from "sonner";
+import Link from "next/link";
 
 const GOALS = [
   { value: "build_muscle", label: "Build Muscle", icon: "💪" },
@@ -57,6 +58,17 @@ export default function ProfilePage() {
     toast.success("Logged out successfully");
   };
 
+  const handlePasswordReset = async () => {
+    const email = profile?.email || user?.email;
+    if (!email) return;
+    try {
+      await sendAdminPasswordReset(email);
+      toast.success("Password reset email sent!");
+    } catch {
+      toast.error("Failed to send password reset email");
+    }
+  };
+
   return (
     <div className="page-container min-h-screen">
       {/* Profile header */}
@@ -92,6 +104,24 @@ export default function ProfilePage() {
           <p className="text-muted-foreground text-[10px]">Volume</p>
         </div>
       </div>
+
+      {/* Admin Panel Card */}
+      {(profile?.role === "admin" || profile?.isAdmin) && (
+        <div className="glass-card p-4 border-neon-green/30 mb-4 animate-fade-in flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-neon-green/20 flex items-center justify-center flex-none">
+              <ShieldAlert className="w-4 h-4 text-neon-green" />
+            </div>
+            <div>
+              <p className="font-semibold text-sm">Admin Access Enabled</p>
+              <p className="text-muted-foreground text-xs">Manage system-wide logs & statistics</p>
+            </div>
+          </div>
+          <Link href="/admin" className="badge-green px-3 py-1.5 text-xs font-semibold">
+            Admin Panel
+          </Link>
+        </div>
+      )}
 
       {/* Profile details */}
       <div className="glass-card p-4 mb-4 animate-fade-in">
@@ -171,6 +201,18 @@ export default function ProfilePage() {
                 </div>
               </div>
             ))}
+
+            {/* Password Reset */}
+            <div className="border-t border-gym-border/40 pt-4 mt-2">
+              <button
+                type="button"
+                onClick={handlePasswordReset}
+                className="w-full py-2 bg-gym-charcoal border border-gym-border text-muted-foreground hover:text-foreground text-xs font-semibold rounded-xl flex items-center justify-center gap-2 transition-all"
+              >
+                <Key className="w-3.5 h-3.5" />
+                Send Password Reset Email
+              </button>
+            </div>
           </div>
         )}
       </div>

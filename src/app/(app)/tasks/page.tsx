@@ -5,14 +5,17 @@ import { useTasks } from "@/hooks/useTasks";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { taskSchema, TaskInput } from "@/lib/validations/workout";
-import { CheckSquare, Plus, X, Trash2, Circle, Calendar } from "lucide-react";
+import { CheckSquare, Plus, X, Trash2, Circle, Calendar, Edit3 } from "lucide-react";
 import { toDate } from "@/lib/utils";
 import { format, isPast } from "date-fns";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import { Task } from "@/types/task";
 
 export default function TasksPage() {
-  const { tasks, loading, addTask, toggleTask, removeTask } = useTasks();
+  const { tasks, loading, addTask, toggleTask, removeTask, editTask } = useTasks();
   const [showForm, setShowForm] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [tab, setTab] = useState<"pending" | "complete">("pending");
 
   const { register, handleSubmit, reset, formState: { isSubmitting } } = useForm<TaskInput>({
@@ -76,6 +79,56 @@ export default function TasksPage() {
             </div>
           </div>
         </form>
+      )}
+
+      {/* Edit task form */}
+      {editingTask && (
+        <div className="glass-card p-4 mb-6 animate-slide-up">
+          <h3 className="font-semibold text-sm mb-3">Edit Task</h3>
+          <div className="flex flex-col gap-3">
+            <input
+              value={editingTask.title}
+              onChange={(e) => setEditingTask({ ...editingTask, title: e.target.value })}
+              placeholder="Task title..."
+              className="w-full px-4 py-3 bg-gym-charcoal border border-gym-border rounded-xl text-sm focus:outline-none focus:border-neon-green/50 transition-colors"
+            />
+            <input
+              value={editingTask.dueDate ? format(toDate(editingTask.dueDate), "yyyy-MM-dd") : ""}
+              onChange={(e) => {
+                const dateVal = e.target.value ? new Date(e.target.value) : null;
+                setEditingTask({ ...editingTask, dueDate: dateVal as any });
+              }}
+              type="date"
+              className="w-full px-4 py-3 bg-gym-charcoal border border-gym-border rounded-xl text-sm focus:outline-none focus:border-neon-green/50 transition-colors text-muted-foreground"
+            />
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setEditingTask(null)}
+                className="flex-1 py-2.5 rounded-xl border border-gym-border text-muted-foreground text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!editingTask.title.trim()) {
+                    toast.error("Title is required");
+                    return;
+                  }
+                  await editTask(editingTask.id!, {
+                    title: editingTask.title,
+                    dueDate: editingTask.dueDate ? new Date(editingTask.dueDate) as any : null,
+                  });
+                  setEditingTask(null);
+                }}
+                className="neon-btn flex-1 py-2.5 text-sm font-bold"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Tabs */}
@@ -161,6 +214,12 @@ export default function TasksPage() {
                     </p>
                   )}
                 </div>
+                <button
+                  onClick={() => setEditingTask(task)}
+                  className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-neon-green hover:bg-neon-green/10 transition-all flex-none"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                </button>
                 <button
                   onClick={() => task.id && removeTask(task.id)}
                   className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all flex-none"

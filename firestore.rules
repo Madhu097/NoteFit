@@ -1,6 +1,13 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Helper function to check if user has the admin role
+    function isAdmin() {
+      return request.auth != null && 
+        (request.auth.token.email == 'admin@notfit.com' ||
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
+    }
+
     // Allow anyone to read phone lookup documents to resolve their email before logging in
     match /phone_lookup/{phone} {
       allow read: if true;
@@ -9,12 +16,14 @@ service cloud.firestore {
     
     // Allow users to read and write their own profile
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      allow write: if request.auth != null && request.auth.uid == userId;
     }
     
     // Allow users to access their own workouts, notes, tasks, progress entries
     match /workouts/{workoutId} {
-      allow read, write: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow read: if request.auth != null && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if request.auth != null && (resource.data.userId == request.auth.uid || isAdmin());
       allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
       
       // Allow access to subcollections
@@ -29,13 +38,24 @@ service cloud.firestore {
     }
     
     match /tasks/{taskId} {
-      allow read, write: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow read: if request.auth != null && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if request.auth != null && (resource.data.userId == request.auth.uid || isAdmin());
       allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
     }
     
     match /progress/{progressId} {
       allow read, write: if request.auth != null && resource.data.userId == request.auth.uid;
       allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+    }
+
+    match /library/{exerciseId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+
+    match /presets/{presetId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
     }
   }
 }

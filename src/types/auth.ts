@@ -13,6 +13,8 @@ export interface UserProfile {
   normalizedPhoneNumber?: string | null;
   createdAt: Timestamp;
   onboardingComplete: boolean;
+  role?: "admin" | "user";
+  isAdmin?: boolean;
 }
 
 export interface AuthState {

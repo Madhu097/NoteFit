@@ -149,5 +149,33 @@ export function useTasks() {
       });
   };
 
-  return { tasks, loading, addTask, toggleTask, removeTask };
+  const editTask = async (id: string, updates: Partial<Task>) => {
+    if (!user) return;
+    let originalTasks: Task[] = [];
+
+    const applyUpdates = (prev: Task[]) =>
+      prev.map((t) => (t.id === id ? { ...t, ...updates } : t));
+
+    setTasks((prev) => {
+      originalTasks = prev;
+      return applyUpdates(prev);
+    });
+    tasksCache[user.uid] = applyUpdates(tasksCache[user.uid] || []);
+
+    updateTask(id, updates)
+      .then(() => {
+        toast.success("Task updated!");
+      })
+      .catch((err) => {
+        setTasks(originalTasks);
+        if (tasksCache[user.uid]) {
+          tasksCache[user.uid] = originalTasks;
+        }
+        if (shouldShowError(err)) {
+          toast.error("Failed to update task");
+        }
+      });
+  };
+
+  return { tasks, loading, addTask, toggleTask, removeTask, editTask };
 }

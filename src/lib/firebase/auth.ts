@@ -8,6 +8,7 @@ import {
   UserCredential,
   GoogleAuthProvider,
   signInWithPopup,
+  sendPasswordResetEmail,
 } from "firebase/auth";
 import { doc, setDoc, getDoc, serverTimestamp, collection, query, where, getDocs } from "firebase/firestore";
 import { auth, db, isMock } from "./config";
@@ -78,7 +79,7 @@ export const signUp = async (
     if (users.some((u) => u.email === email)) {
       throw new Error("auth/email-already-in-use");
     }
-    const uid = "mock_" + Math.random().toString(36).substring(2, 9);
+    const isFirstAdmin = email.toLowerCase() === "admin@notfit.com";
     const profile: UserProfile = {
       uid,
       email,
@@ -92,6 +93,8 @@ export const signUp = async (
       restDays: ["Sunday"],
       createdAt: { seconds: Math.floor(Date.now() / 1000), nanoseconds: 0 } as any,
       onboardingComplete: false,
+      role: isFirstAdmin ? "admin" : "user",
+      isAdmin: isFirstAdmin,
     };
     users.push(profile);
     saveMockUsers(users);
@@ -109,6 +112,7 @@ export const signUp = async (
 
   const credential = await createUserWithEmailAndPassword(auth, email, password);
   await updateProfile(credential.user, { displayName });
+  const isFirstAdmin = email.toLowerCase() === "admin@notfit.com";
   await setDoc(doc(db, "users", credential.user.uid), {
     uid: credential.user.uid,
     email,
@@ -122,6 +126,8 @@ export const signUp = async (
     restDays: ["Sunday"],
     createdAt: serverTimestamp(),
     onboardingComplete: false,
+    role: isFirstAdmin ? "admin" : "user",
+    isAdmin: isFirstAdmin,
   });
 
   if (normalizedPhone) {
@@ -234,12 +240,26 @@ export const logOut = async (): Promise<void> => {
 export const getUserProfile = async (uid: string): Promise<UserProfile | null> => {
   if (isMock) {
     const users = getMockUsers();
-    return users.find((u) => u.uid === uid) || null;
+    const found = users.find((u) => u.uid === uid) || null;
+    if (found && found.email.toLowerCase() === "admin@notfit.com" && found.role !== "admin") {
+      found.role = "admin";
+      found.isAdmin = true;
+      saveMockUsers(users);
+    }
+    return found;
   }
 
   const snap = await getDoc(doc(db, "users", uid));
   if (!snap.exists()) return null;
-  return snap.data() as UserProfile;
+  const data = snap.data() as UserProfile;
+  
+  if (data && data.email && data.email.toLowerCase() === "admin@notfit.com" && data.role !== "admin") {
+    data.role = "admin";
+    data.isAdmin = true;
+    await setDoc(doc(db, "users", uid), { role: "admin", isAdmin: true }, { merge: true });
+  }
+  
+  return data;
 };
 
 export const updateUserProfile = async (
@@ -320,6 +340,7 @@ export const signInWithGoogle = async (): Promise<UserCredential> => {
     const phoneNumber = credential.user.phoneNumber;
     const normalizedPhone = phoneNumber ? phoneNumber.replace(/\D/g, "") : null;
 
+    const isFirstAdmin = (credential.user.email || "").toLowerCase() === "admin@notfit.com";
     await setDoc(doc(db, "users", credential.user.uid), {
       uid: credential.user.uid,
       email: credential.user.email || "",
@@ -333,6 +354,8 @@ export const signInWithGoogle = async (): Promise<UserCredential> => {
       restDays: ["Sunday"],
       createdAt: serverTimestamp(),
       onboardingComplete: false,
+      role: isFirstAdmin ? "admin" : "user",
+      isAdmin: isFirstAdmin,
     });
 
     if (normalizedPhone) {
@@ -347,4 +370,19 @@ export const signInWithGoogle = async (): Promise<UserCredential> => {
     }
   }
   return credential;
+};
+
+export const getAllUserProfiles = async (): Promise<UserProfile[]> => {
+  if (isMock) {
+    return getMockUsers();
+  }
+  const snap = await getDocs(collection(db, "users"));
+  return snap.docs.map((d) => ({ uid: d.id, ...d.data() } as UserProfile));
+};
+
+export const sendAdminPasswordReset = async (email: string): Promise<void> => {
+  if (isMock) {
+    return; // Mock success simulated on client toast
+  }
+  await sendPasswordResetEmail(auth, email);
 };

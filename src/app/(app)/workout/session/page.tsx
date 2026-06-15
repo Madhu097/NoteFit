@@ -22,6 +22,8 @@ const EXERCISE_SUGGESTIONS: Record<string, string[]> = {
   upper: ["Bench Press", "Barbell Row", "Shoulder Press", "Pull-ups", "Bicep Curls", "Tricep Extensions"],
   lower: ["Squat", "Deadlift", "Leg Press", "Leg Curl", "Calf Raises", "Hip Thrust"],
   full_body: ["Squat", "Deadlift", "Bench Press", "Pull-ups", "Shoulder Press", "Lunges"],
+  biceps: ["Bicep Curls", "Hammer Curls", "Preacher Curls", "Incline Dumbbell Curls", "Concentration Curls"],
+  triceps: ["Tricep Pushdowns", "Overhead Tricep Extension", "Skull Crushers", "Dips", "Close Grip Bench Press"],
   custom: ["Custom Exercise"],
 };
 

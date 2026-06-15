@@ -7,6 +7,8 @@ export type WorkoutSplit =
   | "upper"
   | "lower"
   | "full_body"
+  | "biceps"
+  | "triceps"
   | "custom";
 
 export interface ExerciseSet {
@@ -43,5 +45,7 @@ export const WORKOUT_SPLITS: { value: WorkoutSplit; label: string; icon: string 
   { value: "upper", label: "Upper Body", icon: "🏋️" },
   { value: "lower", label: "Lower Body", icon: "🧘" },
   { value: "full_body", label: "Full Body", icon: "⚡" },
+  { value: "biceps", label: "Biceps", icon: "💪" },
+  { value: "triceps", label: "Triceps", icon: "💪" },
   { value: "custom", label: "Custom", icon: "✏️" },
 ];

@@ -7,7 +7,8 @@ import { logOut } from "@/lib/firebase/auth";
 import { useRouter } from "next/navigation";
 import {
   Home, Dumbbell, Calendar, TrendingUp, User,
-  ClipboardList, StickyNote, LogOut, Zap, BookOpen, CheckSquare
+  ClipboardList, StickyNote, LogOut, Zap, BookOpen, CheckSquare,
+  ShieldAlert
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -39,6 +40,12 @@ export default function Sidebar() {
     }
   };
 
+  const isAdmin = profile?.role === "admin" || profile?.isAdmin === true;
+  const navItems = [
+    ...NAV_ITEMS,
+    ...(isAdmin ? [{ href: "/admin", label: "Admin Panel", icon: ShieldAlert }] : [])
+  ];
+
   return (
     <aside className="hidden md:flex flex-col w-64 bg-gym-charcoal border-r border-gym-border h-screen sticky top-0">
       {/* Logo */}
@@ -56,7 +63,7 @@ export default function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 flex flex-col gap-1 overflow-y-auto">
-        {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+        {navItems.map(({ href, label, icon: Icon }) => {
           const active = pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
           return (
             <Link

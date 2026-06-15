@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const workoutSchema = z.object({
-  split: z.enum(["push", "pull", "legs", "upper", "lower", "full_body", "custom"]),
+  split: z.enum(["push", "pull", "legs", "upper", "lower", "full_body", "biceps", "triceps", "custom"]),
   date: z.date(),
   duration: z.number().min(1, "Duration must be at least 1 minute"),
   notes: z.string().optional(),

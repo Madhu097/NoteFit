@@ -465,3 +465,209 @@ export const deleteProgress = async (id: string) => {
 
   await deleteDoc(doc(db, "progress", id));
 };
+
+export const getAllWorkouts = async (): Promise<Workout[]> => {
+  if (isMock) {
+    return getLocalStorageItem<Workout[]>("notfit_mock_workouts", []);
+  }
+  const snap = await getDocs(collection(db, "workouts"));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as Workout));
+};
+
+export const getAllTasks = async (): Promise<Task[]> => {
+  if (isMock) {
+    return getLocalStorageItem<Task[]>("notfit_mock_tasks", []);
+  }
+  const snap = await getDocs(collection(db, "tasks"));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as Task));
+};
+
+export interface LibraryExercise {
+  id?: string;
+  name: string;
+  primaryMuscle: string;
+  secondaryMuscles: string[];
+  category: string;
+  icon: string;
+  instructions: string;
+  tips: string;
+}
+
+const SEED_EXERCISES: Omit<LibraryExercise, "id">[] = [
+  { name: "Bench Press", primaryMuscle: "Chest", secondaryMuscles: ["Triceps", "Front Delts"], category: "Push", icon: "💪", instructions: "Lie flat, grip bar slightly wider than shoulder-width, lower to chest, press up explosively.", tips: "Keep shoulder blades retracted and feet flat on floor." },
+  { name: "Incline Dumbbell Press", primaryMuscle: "Upper Chest", secondaryMuscles: ["Triceps", "Shoulders"], category: "Push", icon: "🏋️", instructions: "Set bench to 30-45°, press dumbbells from shoulder level to full extension.", tips: "Control the descent. Don't let elbows flare too wide." },
+  { name: "Shoulder Press", primaryMuscle: "Shoulders", secondaryMuscles: ["Triceps", "Upper Chest"], category: "Push", icon: "⬆️", instructions: "Press barbell or dumbbells from shoulder level overhead until arms are fully extended.", tips: "Avoid arching your lower back. Engage core." },
+  { name: "Lateral Raises", primaryMuscle: "Side Delts", secondaryMuscles: ["Traps"], category: "Push", icon: "🦅", instructions: "Raise dumbbells to the side until parallel to the floor, slight bend in elbows.", tips: "Lead with your elbows. Control the negative." },
+  { name: "Tricep Pushdowns", primaryMuscle: "Triceps", secondaryMuscles: [], category: "Push", icon: "⬇️", instructions: "Keep elbows fixed at sides, push cable bar down until arms are fully extended.", tips: "Full extension at bottom for peak contraction." },
+  { name: "Deadlift", primaryMuscle: "Hamstrings", secondaryMuscles: ["Glutes", "Lower Back", "Traps", "Lats"], category: "Pull", icon: "🏋️", instructions: "Hip-width stance, bar over mid-foot, hinge hips back, pull bar along legs.", tips: "Push the floor away instead of pulling up. Neutral spine." },
+  { name: "Lat Pulldown", primaryMuscle: "Lats", secondaryMuscles: ["Biceps", "Rear Delts"], category: "Pull", icon: "🔽", instructions: "Grip bar wider than shoulder-width, pull to upper chest, squeeze lats at bottom.", tips: "Lean back slightly. Drive elbows down and back." },
+  { name: "Barbell Row", primaryMuscle: "Mid Back", secondaryMuscles: ["Lats", "Biceps", "Rear Delts"], category: "Pull", icon: "🔙", instructions: "Hip hinge position, pull bar to lower chest/upper abdomen, retract shoulder blades.", tips: "Keep back parallel to floor. Squeeze at top." },
+  { name: "Bicep Curls", primaryMuscle: "Biceps", secondaryMuscles: ["Forearms"], category: "Pull", icon: "💪", instructions: "Stand with dumbbells, curl with supination, squeeze at top, lower slowly.", tips: "Keep elbows pinned to sides. Full range of motion." },
+  { name: "Squat", primaryMuscle: "Quads", secondaryMuscles: ["Glutes", "Hamstrings", "Core"], category: "Legs", icon: "🦵", instructions: "Bar on upper traps, feet shoulder-width, squat until thighs parallel, drive through heels.", tips: "Knees track over toes. Chest up. Depth matters." },
+  { name: "Romanian Deadlift", primaryMuscle: "Hamstrings", secondaryMuscles: ["Glutes", "Lower Back"], category: "Legs", icon: "🦵", instructions: "Stand with bar, hinge at hips while keeping slight knee bend, lower until hamstring stretch.", tips: "Push hips back, not down. Feel the hamstring stretch." },
+  { name: "Leg Press", primaryMuscle: "Quads", secondaryMuscles: ["Glutes", "Hamstrings"], category: "Legs", icon: "🦿", instructions: "Feet shoulder-width on platform, lower until 90°, press through heels.", tips: "Don't lock out knees at top. Full range beats heavy weight." },
+  { name: "Hip Thrust", primaryMuscle: "Glutes", secondaryMuscles: ["Hamstrings", "Core"], category: "Legs", icon: "🍑", instructions: "Upper back on bench, bar on hips, drive through heels to full hip extension.", tips: "Posterior pelvic tilt at top. Squeeze glutes hard." },
+  { name: "Calf Raises", primaryMuscle: "Calves", secondaryMuscles: [], category: "Legs", icon: "🦶", instructions: "Stand on edge of step, rise on toes fully, lower below platform level.", tips: "Full range of motion. Pause at top and bottom." },
+  { name: "Pull-ups", primaryMuscle: "Lats", secondaryMuscles: ["Biceps", "Rear Delts", "Core"], category: "Pull", icon: "🤸", instructions: "Hang from bar, pull until chin above bar, lower with control.", tips: "Dead hang at bottom. No kipping for strength." },
+  { name: "Plank", primaryMuscle: "Core", secondaryMuscles: ["Shoulders", "Glutes"], category: "Core", icon: "🧘", instructions: "Forearms on floor, body in straight line from head to heels.", tips: "Don't let hips sag or pike. Squeeze everything." },
+];
+
+export const getLibraryExercises = async (): Promise<LibraryExercise[]> => {
+  if (isMock) {
+    let list = getLocalStorageItem<LibraryExercise[]>("notfit_mock_library", []);
+    if (!list || list.length === 0) {
+      list = SEED_EXERCISES.map((ex, i) => ({
+        id: `lib_${i}`,
+        ...ex,
+      }));
+      setLocalStorageItem("notfit_mock_library", list);
+    }
+    return list;
+  }
+
+  const snap = await getDocs(collection(db, "library"));
+  if (snap.empty) {
+    const list: LibraryExercise[] = [];
+    for (const ex of SEED_EXERCISES) {
+      const ref = await addDoc(collection(db, "library"), ex);
+      list.push({ id: ref.id, ...ex });
+    }
+    return list;
+  }
+
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as LibraryExercise));
+};
+
+export const addLibraryExercise = async (data: Omit<LibraryExercise, "id">): Promise<string> => {
+  if (isMock) {
+    const list = getLocalStorageItem<LibraryExercise[]>("notfit_mock_library", []);
+    const id = "lib_" + Math.random().toString(36).substring(2, 9);
+    const newItem = { id, ...data };
+    list.push(newItem);
+    setLocalStorageItem("notfit_mock_library", list);
+    return id;
+  }
+
+  const ref = await addDoc(collection(db, "library"), data);
+  return ref.id;
+};
+
+export const updateLibraryExercise = async (id: string, data: Partial<LibraryExercise>): Promise<void> => {
+  if (isMock) {
+    const list = getLocalStorageItem<LibraryExercise[]>("notfit_mock_library", []);
+    const idx = list.findIndex((ex) => ex.id === id);
+    if (idx !== -1) {
+      list[idx] = { ...list[idx], ...data };
+      setLocalStorageItem("notfit_mock_library", list);
+    }
+    return;
+  }
+
+  await updateDoc(doc(db, "library", id), data);
+};
+
+export const deleteLibraryExercise = async (id: string): Promise<void> => {
+  if (isMock) {
+    const list = getLocalStorageItem<LibraryExercise[]>("notfit_mock_library", []);
+    const filtered = list.filter((ex) => ex.id !== id);
+    setLocalStorageItem("notfit_mock_library", filtered);
+    return;
+  }
+
+  await deleteDoc(doc(db, "library", id));
+};
+
+export interface PresetExercise {
+  name: string;
+  sets: {
+    weight: number;
+    reps: number;
+    restTime: number;
+  }[];
+}
+
+export interface PresetWorkout {
+  id?: string;
+  name: string;
+  split: WorkoutSplit;
+  exercises: PresetExercise[];
+  createdBy: string;
+  createdAt?: any;
+}
+
+export const getPresetWorkouts = async (): Promise<PresetWorkout[]> => {
+  if (isMock) {
+    return getLocalStorageItem<PresetWorkout[]>("notfit_mock_presets", []);
+  }
+  const snap = await getDocs(collection(db, "presets"));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as PresetWorkout));
+};
+
+export const createPresetWorkout = async (data: Omit<PresetWorkout, "id">): Promise<string> => {
+  if (isMock) {
+    const list = getLocalStorageItem<PresetWorkout[]>("notfit_mock_presets", []);
+    const id = "preset_" + Math.random().toString(36).substring(2, 9);
+    const newItem = { id, ...data };
+    list.push(newItem);
+    setLocalStorageItem("notfit_mock_presets", list);
+    return id;
+  }
+
+  const ref = await addDoc(collection(db, "presets"), {
+    ...data,
+    createdAt: serverTimestamp(),
+  });
+  return ref.id;
+};
+
+export const updatePresetWorkout = async (id: string, data: Partial<PresetWorkout>): Promise<void> => {
+  if (isMock) {
+    const list = getLocalStorageItem<PresetWorkout[]>("notfit_mock_presets", []);
+    const idx = list.findIndex((p) => p.id === id);
+    if (idx !== -1) {
+      list[idx] = { ...list[idx], ...data } as PresetWorkout;
+      setLocalStorageItem("notfit_mock_presets", list);
+    }
+    return;
+  }
+
+  await updateDoc(doc(db, "presets", id), data);
+};
+
+export const deletePresetWorkout = async (id: string): Promise<void> => {
+  if (isMock) {
+    const list = getLocalStorageItem<PresetWorkout[]>("notfit_mock_presets", []);
+    const filtered = list.filter((p) => p.id !== id);
+    setLocalStorageItem("notfit_mock_presets", filtered);
+    return;
+  }
+
+  await deleteDoc(doc(db, "presets", id));
+};
+
+export const startWorkoutFromPreset = async (userId: string, preset: PresetWorkout): Promise<string> => {
+  const workoutId = await createWorkout(userId, {
+    date: new Date(),
+    split: preset.split,
+    duration: 0,
+    notes: `Suggested Routine: ${preset.name}`,
+    exerciseCount: preset.exercises.length,
+    totalVolume: 0,
+  });
+
+  for (let i = 0; i < preset.exercises.length; i++) {
+    const ex = preset.exercises[i];
+    await addExercise(workoutId, {
+      name: ex.name,
+      sets: ex.sets.map((s) => ({
+        weight: Number(s.weight) || 0,
+        reps: Number(s.reps) || 10,
+        restTime: Number(s.restTime) || 90,
+        completed: false,
+      })),
+      order: i,
+    });
+  }
+
+  return workoutId;
+};

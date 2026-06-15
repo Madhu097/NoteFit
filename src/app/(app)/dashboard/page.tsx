@@ -1,13 +1,20 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/providers/AuthProvider";
 import { useWorkouts } from "@/hooks/useWorkouts";
 import { useTasks } from "@/hooks/useTasks";
 import {
+  getPresetWorkouts, createPresetWorkout, updatePresetWorkout,
+  deletePresetWorkout, startWorkoutFromPreset, PresetWorkout,
+  PresetExercise
+} from "@/lib/firebase/firestore";
+import { WorkoutSplit } from "@/types/workout";
+import {
   Flame, Dumbbell, Scale, Plus, ChevronRight,
-  Clock, CheckSquare, TrendingUp, Zap, Trophy
+  Clock, CheckSquare, TrendingUp, Zap, Trophy, Trash2, Edit3, X, Save
 } from "lucide-react";
 import {
   getGreeting, formatWorkoutDate, formatDuration,
@@ -15,6 +22,7 @@ import {
 } from "@/lib/utils";
 import { format, startOfWeek, endOfWeek, isWithinInterval } from "date-fns";
 import type { Workout } from "@/types/workout";
+import { toast } from "sonner";
 
 function SkeletonCard() {
   return (
@@ -38,9 +46,42 @@ function SkeletonCard() {
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
   const { user, profile } = useAuth();
-  const { workouts, loading: wLoading } = useWorkouts();
+  const { workouts, loading: wLoading, refetch: refetchWorkouts } = useWorkouts();
   const { tasks, loading: tLoading } = useTasks();
+
+  const [presets, setPresets] = useState<PresetWorkout[]>([]);
+  const [loadingPresets, setLoadingPresets] = useState(true);
+
+  // Admin Preset form states
+  const [showPresetForm, setShowPresetForm] = useState(false);
+  const [editingPreset, setEditingPreset] = useState<PresetWorkout | null>(null);
+  const [presetName, setPresetName] = useState("");
+  const [presetSplit, setPresetSplit] = useState<WorkoutSplit>("push");
+  const [presetExercises, setPresetExercises] = useState<{ name: string; setsCount: number }[]>([
+    { name: "", setsCount: 3 }
+  ]);
+  const [savingPreset, setSavingPreset] = useState(false);
+  const [startingPresetId, setStartingPresetId] = useState<string | null>(null);
+
+  const isAdmin = profile?.role === "admin" || profile?.isAdmin === true;
+
+  const fetchPresets = async () => {
+    setLoadingPresets(true);
+    try {
+      const list = await getPresetWorkouts();
+      setPresets(list || []);
+    } catch {
+      toast.error("Failed to load suggested workouts");
+    } finally {
+      setLoadingPresets(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPresets();
+  }, []);
 
   const streak = useMemo(() => {
     if (!workouts.length || !profile) return 0;
@@ -68,22 +109,262 @@ export default function DashboardPage() {
 
   const freq = profile?.workoutFrequency ?? 4;
 
+  const handleOpenAddPreset = () => {
+    setPresetName("");
+    setPresetSplit("push");
+    setPresetExercises([{ name: "", setsCount: 3 }]);
+    setEditingPreset(null);
+    setShowPresetForm(true);
+  };
+
+  const handleOpenEditPreset = (preset: PresetWorkout) => {
+    setEditingPreset(preset);
+    setPresetName(preset.name);
+    setPresetSplit(preset.split);
+    setPresetExercises(
+      preset.exercises.map((e) => ({
+        name: e.name,
+        setsCount: e.sets.length || 3
+      }))
+    );
+    setShowPresetForm(false);
+  };
+
+  const handleAddExerciseRow = () => {
+    setPresetExercises([...presetExercises, { name: "", setsCount: 3 }]);
+  };
+
+  const handleRemoveExerciseRow = (idx: number) => {
+    if (presetExercises.length === 1) return;
+    setPresetExercises(presetExercises.filter((_, i) => i !== idx));
+  };
+
+  const handleExerciseRowChange = (idx: number, field: "name" | "setsCount", val: any) => {
+    const updated = [...presetExercises];
+    updated[idx] = { ...updated[idx], [field]: val };
+    setPresetExercises(updated);
+  };
+
+  const handleSavePreset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!presetName.trim()) {
+      toast.error("Suggested routine name is required");
+      return;
+    }
+
+    const filteredEx = presetExercises.filter((e) => e.name.trim());
+    if (filteredEx.length === 0) {
+      toast.error("At least one exercise is required");
+      return;
+    }
+
+    setSavingPreset(true);
+
+    const exercisesData: PresetExercise[] = filteredEx.map((ex) => ({
+      name: ex.name.trim(),
+      sets: Array.from({ length: ex.setsCount }).map(() => ({
+        weight: 0,
+        reps: 10,
+        restTime: 90
+      }))
+    }));
+
+    const presetData = {
+      name: presetName.trim(),
+      split: presetSplit,
+      exercises: exercisesData,
+      createdBy: "admin"
+    };
+
+    try {
+      if (editingPreset) {
+        await updatePresetWorkout(editingPreset.id!, presetData);
+        toast.success("Suggested routine updated!");
+        setEditingPreset(null);
+      } else {
+        await createPresetWorkout(presetData);
+        toast.success("Suggested routine created!");
+        setShowPresetForm(false);
+      }
+      fetchPresets();
+    } catch {
+      toast.error("Failed to save suggested routine");
+    } finally {
+      setSavingPreset(false);
+    }
+  };
+
+  const handleDeletePreset = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm("Delete this suggested workout preset?")) return;
+    try {
+      await deletePresetWorkout(id);
+      toast.success("Preset deleted successfully");
+      fetchPresets();
+    } catch {
+      toast.error("Failed to delete suggested routine");
+    }
+  };
+
+  const handleStartPreset = async (preset: PresetWorkout) => {
+    if (!user) return;
+    setStartingPresetId(preset.id || "");
+    try {
+      const workoutId = await startWorkoutFromPreset(user.uid, preset);
+      refetchWorkouts();
+      toast.success(`Started workout split: ${preset.name}!`);
+      router.push(`/workout/session?id=${workoutId}`);
+    } catch (err) {
+      toast.error("Failed to start workout from suggested routine");
+    } finally {
+      setStartingPresetId(null);
+    }
+  };
+
   return (
-    <div className="page-container min-h-screen">
+    <div className="page-container min-h-screen pb-16">
       {/* Header greeting */}
-      <div className="mb-6 animate-fade-in">
-        <p className="text-muted-foreground text-sm font-medium mb-1">{getGreeting()},</p>
-        <h1 className="font-display text-3xl font-black">
-          {(profile?.displayName || user?.displayName || "Athlete").split(" ")[0]}
-        </h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          {format(new Date(), "EEEE, dd MMMM yyyy")}
-        </p>
+      <div className="mb-6 animate-fade-in flex items-center justify-between">
+        <div>
+          <p className="text-muted-foreground text-sm font-medium mb-1">{getGreeting()},</p>
+          <h1 className="font-display text-3xl font-black">
+            {(profile?.displayName || user?.displayName || "Athlete").split(" ")[0]}
+          </h1>
+          <p className="text-muted-foreground text-xs mt-1">
+            {format(new Date(), "EEEE, dd MMMM yyyy")}
+          </p>
+        </div>
+        
+        {isAdmin && !showPresetForm && !editingPreset && (
+          <button
+            onClick={handleOpenAddPreset}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-neon-green/10 border border-neon-green/30 text-neon-green hover:bg-neon-green/20 transition-all text-xs font-bold"
+          >
+            <Plus className="w-3.5 h-3.5" /> Suggest Workout
+          </button>
+        )}
       </div>
+
+      {/* Admin Preset Form */}
+      {isAdmin && (showPresetForm || editingPreset) && (
+        <form onSubmit={handleSavePreset} className="glass-card p-4 mb-6 animate-slide-up">
+          <div className="flex items-center justify-between mb-4 border-b border-gym-border/40 pb-2">
+            <h3 className="font-bold text-sm text-neon-green">
+              {editingPreset ? "Edit Suggested Workout" : "Create Suggested Workout"}
+            </h3>
+            <button
+              type="button"
+              onClick={() => {
+                setShowPresetForm(false);
+                setEditingPreset(null);
+              }}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="flex flex-col gap-3">
+            <div>
+              <label className="text-[10px] text-muted-foreground mb-1 block font-semibold">ROUTINE NAME</label>
+              <input
+                value={presetName}
+                onChange={(e) => setPresetName(e.target.value)}
+                placeholder="e.g. Hypertrophy Chest Blaster"
+                className="w-full px-3 py-2 bg-gym-charcoal border border-gym-border rounded-lg text-sm text-foreground focus:outline-none focus:border-neon-green/50"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] text-muted-foreground mb-1 block font-semibold">WORKOUT SPLIT</label>
+              <select
+                value={presetSplit}
+                onChange={(e) => setPresetSplit(e.target.value as WorkoutSplit)}
+                className="w-full px-3 py-2 bg-gym-charcoal border border-gym-border rounded-lg text-sm text-foreground focus:outline-none focus:border-neon-green/50"
+              >
+                <option value="push">Push</option>
+                <option value="pull">Pull</option>
+                <option value="legs">Legs</option>
+                <option value="upper">Upper Body</option>
+                <option value="lower">Lower Body</option>
+                <option value="full_body">Full Body</option>
+                <option value="biceps">Biceps</option>
+                <option value="triceps">Triceps</option>
+                <option value="custom">Custom</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-[10px] text-muted-foreground mb-2 block font-semibold">EXERCISES LIST</label>
+              <div className="flex flex-col gap-2 max-h-[220px] overflow-y-auto pr-1">
+                {presetExercises.map((ex, idx) => (
+                  <div key={idx} className="flex gap-2 items-center">
+                    <input
+                      value={ex.name}
+                      onChange={(e) => handleExerciseRowChange(idx, "name", e.target.value)}
+                      placeholder="e.g. Bench Press"
+                      className="flex-1 px-2.5 py-1.5 bg-gym-charcoal border border-gym-border rounded-lg text-xs text-foreground focus:outline-none focus:border-neon-green/40"
+                    />
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        value={ex.setsCount}
+                        onChange={(e) => handleExerciseRowChange(idx, "setsCount", Number(e.target.value) || 1)}
+                        className="w-10 text-center py-1.5 bg-gym-charcoal border border-gym-border rounded-lg text-xs text-foreground focus:outline-none focus:border-neon-green/40"
+                        min="1"
+                      />
+                      <span className="text-[10px] text-muted-foreground">sets</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveExerciseRow(idx)}
+                      disabled={presetExercises.length === 1}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 disabled:opacity-30 flex-none"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={handleAddExerciseRow}
+                className="mt-2 text-xs font-bold text-neon-green hover:underline flex items-center gap-0.5"
+              >
+                <Plus className="w-3 h-3" /> Add Exercise
+              </button>
+            </div>
+
+            <div className="flex gap-2 mt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPresetForm(false);
+                  setEditingPreset(null);
+                }}
+                className="flex-1 py-2 rounded-xl border border-gym-border text-muted-foreground text-xs"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={savingPreset}
+                className="flex-1 py-2 bg-neon-green/20 border border-neon-green/40 text-neon-green rounded-xl text-xs font-bold flex items-center justify-center gap-1 hover:bg-neon-green/30 disabled:opacity-50"
+              >
+                {savingPreset ? (
+                  <div className="w-3.5 h-3.5 border border-neon-green/30 border-t-neon-green rounded-full animate-spin" />
+                ) : (
+                  <><Save className="w-3.5 h-3.5" /> Save Workout Preset</>
+                )}
+              </button>
+            </div>
+          </div>
+        </form>
+      )}
 
       {/* Quick stats row */}
       <div className="grid grid-cols-3 gap-3 mb-6 animate-fade-in">
-        {/* Streak */}
         <div className="stat-card">
           <div className="flex items-center gap-1.5 mb-1">
             <Flame className="w-3.5 h-3.5 text-orange-400" />
@@ -95,7 +376,6 @@ export default function DashboardPage() {
           <p className="text-muted-foreground text-[10px]">days</p>
         </div>
 
-        {/* Weight */}
         <div className="stat-card">
           <div className="flex items-center gap-1.5 mb-1">
             <Scale className="w-3.5 h-3.5 text-neon-blue" />
@@ -107,7 +387,6 @@ export default function DashboardPage() {
           <p className="text-muted-foreground text-[10px]">kg</p>
         </div>
 
-        {/* Total Workouts */}
         <div className="stat-card">
           <div className="flex items-center gap-1.5 mb-1">
             <Trophy className="w-3.5 h-3.5 text-pr-gold" />
@@ -121,10 +400,7 @@ export default function DashboardPage() {
       </div>
 
       {/* START WORKOUT CTA */}
-      <Link
-        href="/workout"
-        className="block mb-6 animate-slide-up"
-      >
+      <Link href="/workout" className="block mb-6 animate-slide-up">
         <div className="relative overflow-hidden rounded-2xl neon-btn p-5">
           <div className="absolute inset-0 bg-gradient-to-r from-neon-green to-emerald-400 opacity-90" />
           <div className="relative flex items-center justify-between">
@@ -142,6 +418,62 @@ export default function DashboardPage() {
           </div>
         </div>
       </Link>
+
+      {/* Suggested Preset Workouts */}
+      {!loadingPresets && presets.length > 0 && (
+        <div className="mb-6 animate-fade-in">
+          <h3 className="section-heading mb-3 flex items-center gap-1">
+            Suggested Routines <span className="text-[10px] badge-blue px-2 py-0.5 rounded font-bold">Presets</span>
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {presets.map((preset) => (
+              <div
+                key={preset.id}
+                onClick={() => handleStartPreset(preset)}
+                className="glass-card p-4 flex items-center justify-between hover:border-neon-green/30 cursor-pointer transition-all duration-200 active:scale-[0.98]"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-neon-green/10 flex items-center justify-center flex-none">
+                    <Zap className="w-5 h-5 text-neon-green animate-glow-pulse" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm text-foreground capitalize truncate max-w-[150px] md:max-w-[180px]">
+                      {preset.name}
+                    </h4>
+                    <p className="text-muted-foreground text-xs">
+                      {preset.split} split · {preset.exercises?.length || 0} exercises
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                  {isAdmin && (
+                    <>
+                      <button
+                        onClick={() => handleOpenEditPreset(preset)}
+                        className="w-7.5 h-7.5 rounded-lg flex items-center justify-center text-muted-foreground hover:text-neon-green hover:bg-neon-green/10 transition-all"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={(e) => preset.id && handleDeletePreset(preset.id, e)}
+                        className="w-7.5 h-7.5 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </>
+                  )}
+                  {startingPresetId === preset.id ? (
+                    <div className="w-4 h-4 border-2 border-neon-green/30 border-t-neon-green rounded-full animate-spin" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Weekly Progress */}
       <div className="glass-card p-4 mb-6 animate-fade-in">
