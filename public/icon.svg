@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <rect width="512" height="512" rx="112" fill="#0A0A0B"/>
+  <!-- Circle outline for weight plate -->
+  <circle cx="256" cy="256" r="160" fill="none" stroke="#39FF14" stroke-width="20" stroke-opacity="0.2"/>
+  <circle cx="256" cy="256" r="120" fill="none" stroke="#39FF14" stroke-width="10" stroke-opacity="0.4"/>
+  <!-- Glowing lightning bolt -->
+  <path d="M280 60 L140 280 H250 L232 452 L372 232 H262 Z" fill="#39FF14" filter="drop-shadow(0px 0px 15px rgba(57, 255, 20, 0.6))"/>
+</svg>

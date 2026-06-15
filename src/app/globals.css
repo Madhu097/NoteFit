@@ -1,0 +1,179 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Poppins:wght@600;700;800;900&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 4%;
+    --foreground: 0 0% 95%;
+    --card: 240 6% 10%;
+    --card-foreground: 0 0% 95%;
+    --popover: 240 6% 8%;
+    --popover-foreground: 0 0% 95%;
+    --primary: 109 100% 54%;
+    --primary-foreground: 0 0% 0%;
+    --secondary: 240 5% 15%;
+    --secondary-foreground: 0 0% 80%;
+    --muted: 240 5% 18%;
+    --muted-foreground: 240 5% 55%;
+    --accent: 188 100% 50%;
+    --accent-foreground: 0 0% 0%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 5% 18%;
+    --input: 240 5% 15%;
+    --ring: 109 100% 54%;
+    --radius: 0.75rem;
+    --chart-1: 109 100% 54%;
+    --chart-2: 188 100% 50%;
+    --chart-3: 43 100% 50%;
+    --chart-4: 270 60% 60%;
+    --chart-5: 0 72% 51%;
+    --sidebar-background: 240 6% 7%;
+    --sidebar-foreground: 0 0% 90%;
+    --sidebar-primary: 109 100% 54%;
+    --sidebar-primary-foreground: 0 0% 0%;
+    --sidebar-accent: 240 5% 14%;
+    --sidebar-accent-foreground: 0 0% 80%;
+    --sidebar-border: 240 5% 15%;
+    --sidebar-ring: 109 100% 54%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    min-height: 100dvh;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground));
+  }
+}
+
+@layer components {
+  /* Glass card effect */
+  .glass-card {
+    @apply bg-card/80 backdrop-blur-sm border border-border/50 rounded-2xl;
+  }
+
+  /* Neon glow button */
+  .neon-btn {
+    @apply bg-neon-green text-black font-bold rounded-xl transition-all duration-200;
+    box-shadow: 0 0 20px rgba(57, 255, 20, 0.3);
+  }
+  .neon-btn:hover {
+    box-shadow: 0 0 35px rgba(57, 255, 20, 0.5);
+    transform: translateY(-1px);
+  }
+  .neon-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 0 15px rgba(57, 255, 20, 0.4);
+  }
+
+  /* Page container */
+  .page-container {
+    @apply max-w-2xl mx-auto px-4 py-6;
+  }
+
+  /* Section heading */
+  .section-heading {
+    @apply text-sm font-semibold text-muted-foreground uppercase tracking-widest mb-3;
+  }
+
+  /* Stat card */
+  .stat-card {
+    @apply glass-card p-4 flex flex-col gap-1;
+  }
+
+  /* Input dark style */
+  .dark-input {
+    @apply bg-gym-charcoal border-gym-border text-foreground placeholder:text-muted-foreground focus:border-neon-green/50 focus:ring-neon-green/20;
+  }
+
+  /* Badge variants */
+  .badge-green {
+    @apply bg-neon-green/10 text-neon-green border border-neon-green/20 px-2 py-0.5 rounded-full text-xs font-semibold;
+  }
+  .badge-blue {
+    @apply bg-neon-blue/10 text-neon-blue border border-neon-blue/20 px-2 py-0.5 rounded-full text-xs font-semibold;
+  }
+  .badge-gold {
+    @apply bg-pr-gold/10 text-pr-gold border border-pr-gold/20 px-2 py-0.5 rounded-full text-xs font-semibold;
+  }
+
+  /* Bottom nav safe area */
+  .bottom-nav-padding {
+    @apply pb-24 md:pb-0;
+  }
+
+  /* Workout split card */
+  .split-card {
+    @apply glass-card p-4 cursor-pointer transition-all duration-200 flex flex-col items-center gap-2 border-2;
+  }
+  .split-card:hover,
+  .split-card.selected {
+    @apply border-neon-green/50 bg-neon-green/5;
+    box-shadow: 0 0 20px rgba(57, 255, 20, 0.1);
+  }
+
+  /* Shimmer loading */
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--card)) 25%,
+      hsl(var(--muted)) 50%,
+      hsl(var(--card)) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+}
+
+/* Animation utilities */
+@layer utilities {
+  .animate-in {
+    animation: fade-in 0.3s ease-out;
+  }
+
+  .text-gradient {
+    background: linear-gradient(135deg, #39FF14, #00F5FF);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .neon-glow {
+    box-shadow: 0 0 20px rgba(57, 255, 20, 0.4);
+  }
+
+  .border-glow {
+    border-color: rgba(57, 255, 20, 0.5);
+    box-shadow: 0 0 10px rgba(57, 255, 20, 0.1) inset;
+  }
+}
