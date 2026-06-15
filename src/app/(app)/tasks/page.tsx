@@ -118,7 +118,7 @@ export default function TasksPage() {
                   }
                   await editTask(editingTask.id!, {
                     title: editingTask.title,
-                    dueDate: editingTask.dueDate ? new Date(editingTask.dueDate) as any : null,
+                    dueDate: editingTask.dueDate ? toDate(editingTask.dueDate) as any : null,
                   });
                   setEditingTask(null);
                 }}
