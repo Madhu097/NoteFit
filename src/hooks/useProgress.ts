@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { getProgress, addProgress, updateProgress, deleteProgress } from "@/lib/firebase/firestore";
 import { ProgressEntry } from "@/types/progress";
 import { useAuth } from "@/providers/AuthProvider";
+import { toDate } from "@/lib/utils";
 import { toast } from "sonner";
 
 const shouldShowError = (err: any) => {
@@ -55,7 +56,7 @@ export function useProgress() {
 
     // Optimistically add and sort by date descending
     const addAndSort = (prev: ProgressEntry[]) => 
-      [newEntry, ...prev].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      [newEntry, ...prev].sort((a, b) => toDate(b.date).getTime() - toDate(a.date).getTime());
 
     setProgress((prev) => addAndSort(prev));
     progressCache[user.uid] = addAndSort(progressCache[user.uid] || []);
@@ -89,7 +90,7 @@ export function useProgress() {
 
     const updateAndSort = (prev: ProgressEntry[]) =>
       prev.map((p) => (p.id === id ? { ...p, ...data } : p))
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        .sort((a, b) => toDate(b.date).getTime() - toDate(a.date).getTime());
 
     setProgress((prev) => {
       originalProgress = prev;
