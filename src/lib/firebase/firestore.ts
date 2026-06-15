@@ -14,7 +14,7 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { db, isMock } from "./config";
-import { Workout, Exercise } from "@/types/workout";
+import { Workout, Exercise, WorkoutSplit } from "@/types/workout";
 import { Note } from "@/types/note";
 import { Task } from "@/types/task";
 import { ProgressEntry } from "@/types/progress";
