@@ -80,6 +80,7 @@ export const signUp = async (
       throw new Error("auth/email-already-in-use");
     }
     const isFirstAdmin = email.toLowerCase() === "admin@notfit.com";
+    const uid = "mock_user_" + Math.random().toString(36).substring(2, 9);
     const profile: UserProfile = {
       uid,
       email,
