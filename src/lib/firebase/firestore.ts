@@ -14,16 +14,20 @@ import {
   limit,
   Timestamp,
   serverTimestamp,
+  QuerySnapshot,
+  DocumentData,
+  QueryDocumentSnapshot,
+  DocumentSnapshot,
 } from "firebase/firestore";
 
-const getDocs = async (q: any): Promise<any> => {
+const getDocs = async (q: any): Promise<QuerySnapshot<DocumentData, DocumentData>> => {
   const isOffline = typeof window !== "undefined" && !window.navigator.onLine;
   if (isOffline) {
     try {
       return await getDocsFromCache(q);
     } catch (err) {
       console.warn("Offline cache fetch failed, returning empty snapshot:", err);
-      return { empty: true, docs: [] };
+      return { empty: true, docs: [] } as unknown as QuerySnapshot<DocumentData, DocumentData>;
     }
   }
   
@@ -35,19 +39,19 @@ const getDocs = async (q: any): Promise<any> => {
       return await getDocsFromCache(q);
     } catch (cacheErr) {
       console.warn("Cache fallback failed, returning empty snapshot:", cacheErr);
-      return { empty: true, docs: [] };
+      return { empty: true, docs: [] } as unknown as QuerySnapshot<DocumentData, DocumentData>;
     }
   }
 };
 
-const getDoc = async (docRef: any): Promise<any> => {
+const getDoc = async (docRef: any): Promise<DocumentSnapshot<DocumentData, DocumentData>> => {
   const isOffline = typeof window !== "undefined" && !window.navigator.onLine;
   if (isOffline) {
     try {
       return await getDocFromCache(docRef);
     } catch (err) {
       console.warn("Offline single document fetch failed, returning empty document:", err);
-      return { exists: () => false, data: () => undefined, id: docRef.id };
+      return { exists: () => false, data: () => undefined, id: docRef.id } as unknown as DocumentSnapshot<DocumentData, DocumentData>;
     }
   }
   
@@ -59,7 +63,7 @@ const getDoc = async (docRef: any): Promise<any> => {
       return await getDocFromCache(docRef);
     } catch (cacheErr) {
       console.warn("Cache fallback for single document failed, returning empty document:", cacheErr);
-      return { exists: () => false, data: () => undefined, id: docRef.id };
+      return { exists: () => false, data: () => undefined, id: docRef.id } as unknown as DocumentSnapshot<DocumentData, DocumentData>;
     }
   }
 };
