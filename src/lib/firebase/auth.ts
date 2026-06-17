@@ -9,8 +9,9 @@ import {
   GoogleAuthProvider,
   signInWithPopup,
   sendPasswordResetEmail,
+  deleteUser,
 } from "firebase/auth";
-import { doc, setDoc, getDoc, serverTimestamp, collection, query, where, getDocs } from "firebase/firestore";
+import { doc, setDoc, getDoc, serverTimestamp, collection, query, where, getDocs, deleteDoc } from "firebase/firestore";
 import { auth, db, isMock } from "./config";
 import { UserProfile } from "@/types/auth";
 
@@ -386,4 +387,110 @@ export const sendAdminPasswordReset = async (email: string): Promise<void> => {
     return; // Mock success simulated on client toast
   }
   await sendPasswordResetEmail(auth, email);
+};
+
+export const deleteUserAccount = async (uid: string): Promise<void> => {
+  if (isMock) {
+    // 1. Delete user from mock users list
+    const users = getMockUsers();
+    const filteredUsers = users.filter((u) => u.uid !== uid);
+    saveMockUsers(filteredUsers);
+
+    // 2. Remove mock current user
+    saveMockCurrentUser(null);
+    notifyListeners(null);
+
+    // 3. Delete user's mock data from localStorage
+    if (typeof window !== "undefined") {
+      const getLocalItem = <T>(key: string, defaultValue: T): T => {
+        const val = localStorage.getItem(key);
+        return val ? JSON.parse(val) : defaultValue;
+      };
+
+      // Clean up mock workouts and their associated exercise subcollection caches
+      const workouts = getLocalItem<any[]>("notfit_mock_workouts", []);
+      const userWorkoutIds = workouts.filter((w) => w.userId === uid).map((w) => w.id);
+      
+      const remainingWorkouts = workouts.filter((w) => w.userId !== uid);
+      localStorage.setItem("notfit_mock_workouts", JSON.stringify(remainingWorkouts));
+
+      userWorkoutIds.forEach((wid) => {
+        localStorage.removeItem(`notfit_mock_exercises_${wid}`);
+      });
+
+      // Clean up mock notes
+      const notes = getLocalItem<any[]>("notfit_mock_notes", []);
+      const remainingNotes = notes.filter((n) => n.userId !== uid);
+      localStorage.setItem("notfit_mock_notes", JSON.stringify(remainingNotes));
+
+      // Clean up mock tasks
+      const tasks = getLocalItem<any[]>("notfit_mock_tasks", []);
+      const remainingTasks = tasks.filter((t) => t.userId !== uid);
+      localStorage.setItem("notfit_mock_tasks", JSON.stringify(remainingTasks));
+
+      // Clean up mock progress
+      const progress = getLocalItem<any[]>("notfit_mock_progress", []);
+      const remainingProgress = progress.filter((p) => p.userId !== uid);
+      localStorage.setItem("notfit_mock_progress", JSON.stringify(remainingProgress));
+
+      // Clean up profile cache
+      localStorage.removeItem("notfit_cached_profile");
+    }
+    return;
+  }
+
+  const currentUser = auth.currentUser;
+  if (!currentUser) throw new Error("No user is signed in.");
+  if (currentUser.uid !== uid) throw new Error("UID mismatch error.");
+
+  // 1. Fetch user profile to read phone number first (so we can delete phone lookup doc)
+  const profileSnap = await getDoc(doc(db, "users", uid));
+  const profileData = profileSnap.exists() ? profileSnap.data() : null;
+  const normalizedPhone = profileData?.normalizedPhoneNumber || profileData?.phoneNumber?.replace(/\D/g, "");
+
+  // 2. Clean up workouts & exercises
+  const workoutsSnap = await getDocs(query(collection(db, "workouts"), where("userId", "==", uid)));
+  for (const wDoc of workoutsSnap.docs) {
+    const wId = wDoc.id;
+    // Delete exercises subcollection
+    const exercisesSnap = await getDocs(collection(db, "workouts", wId, "exercises"));
+    for (const exDoc of exercisesSnap.docs) {
+      await deleteDoc(doc(db, "workouts", wId, "exercises", exDoc.id));
+    }
+    // Delete workout document
+    await deleteDoc(doc(db, "workouts", wId));
+  }
+
+  // 3. Clean up notes
+  const notesSnap = await getDocs(query(collection(db, "notes"), where("userId", "==", uid)));
+  for (const nDoc of notesSnap.docs) {
+    await deleteDoc(doc(db, "notes", nDoc.id));
+  }
+
+  // 4. Clean up tasks
+  const tasksSnap = await getDocs(query(collection(db, "tasks"), where("userId", "==", uid)));
+  for (const tDoc of tasksSnap.docs) {
+    await deleteDoc(doc(db, "tasks", tDoc.id));
+  }
+
+  // 5. Clean up progress entries
+  const progressSnap = await getDocs(query(collection(db, "progress"), where("userId", "==", uid)));
+  for (const pDoc of progressSnap.docs) {
+    await deleteDoc(doc(db, "progress", pDoc.id));
+  }
+
+  // 6. Clean up phone lookup document
+  if (normalizedPhone) {
+    try {
+      await deleteDoc(doc(db, "phone_lookup", normalizedPhone));
+    } catch (err) {
+      console.warn("Failed to delete phone lookup mapping:", err);
+    }
+  }
+
+  // 7. Delete user profile document
+  await deleteDoc(doc(db, "users", uid));
+
+  // 8. Delete user from Firebase Authentication
+  await deleteUser(currentUser);
 };

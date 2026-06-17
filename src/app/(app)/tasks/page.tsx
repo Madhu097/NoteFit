@@ -32,7 +32,7 @@ export default function TasksPage() {
   const filtered = tasks.filter((t) => t.status === tab);
 
   return (
-    <div className="page-container min-h-screen">
+    <div className="page-container pb-24">
       <div className="flex items-center justify-between mb-6">
         <h1 className="font-display text-2xl font-black">Tasks</h1>
         <button

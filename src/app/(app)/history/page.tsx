@@ -25,7 +25,7 @@ export default function HistoryPage() {
   }, [workouts, search, filter]);
 
   return (
-    <div className="page-container min-h-screen">
+    <div className="page-container pb-24">
       <h1 className="font-display text-2xl font-black mb-6">Workout History</h1>
 
       {/* Search */}

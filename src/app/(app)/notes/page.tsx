@@ -72,7 +72,7 @@ export default function NotesPage() {
   const [editingNote, setEditingNote] = useState<Note | null>(null);
 
   return (
-    <div className="page-container min-h-screen">
+    <div className="page-container pb-24">
       <div className="flex items-center justify-between mb-6">
         <h1 className="font-display text-2xl font-black">Notes</h1>
         <button

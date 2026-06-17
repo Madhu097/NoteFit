@@ -2,13 +2,14 @@
 
 import { useState } from "react";
 import { useAuth } from "@/providers/AuthProvider";
+import { usePWA } from "@/providers/PWAProvider";
 import { useWorkouts } from "@/hooks/useWorkouts";
 import { useProgress } from "@/hooks/useProgress";
-import { updateUserProfile, logOut, sendAdminPasswordReset } from "@/lib/firebase/auth";
+import { updateUserProfile, logOut, sendAdminPasswordReset, deleteUserAccount } from "@/lib/firebase/auth";
 import { useRouter } from "next/navigation";
 import {
   User, Scale, Target, Calendar, Dumbbell, TrendingUp,
-  LogOut, Edit3, Save, X, Flame, ShieldAlert, Key
+  LogOut, Edit3, Save, X, Flame, ShieldAlert, Key, Download
 } from "lucide-react";
 import { cn, calculateStreak, formatVolume } from "@/lib/utils";
 import { toast } from "sonner";
@@ -25,11 +26,43 @@ export default function ProfilePage() {
   const { user, profile, refreshProfile } = useAuth();
   const { workouts } = useWorkouts();
   const { progress } = useProgress();
+  const { isInstallable, isInstalled, isIOS, installApp } = usePWA();
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [weight, setWeight] = useState(String(profile?.currentWeight ?? ""));
   const [goal, setGoal] = useState(profile?.fitnessGoal ?? "build_muscle");
+
+  // Deletion States
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmEmail, setConfirmEmail] = useState("");
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDeleteAccount = async () => {
+    if (!user) return;
+    
+    const targetEmail = profile?.email || user?.email;
+    if (confirmEmail !== targetEmail) {
+      toast.error("Email verification failed. Please type your correct email.");
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      await deleteUserAccount(user.uid);
+      toast.success("Account deleted successfully.");
+      router.replace("/login");
+    } catch (err: any) {
+      console.error(err);
+      if (err?.code === "auth/requires-recent-login" || err?.message?.includes("requires-recent-login")) {
+        toast.error("Security verification required. Please sign out, sign back in, and try again.");
+      } else {
+        toast.error("Failed to delete account. Please try again.");
+      }
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const streak = calculateStreak(workouts, profile?.restDays ?? ["Sunday"]);
   const totalVolume = workouts.reduce((s, w) => s + w.totalVolume, 0);
@@ -70,7 +103,7 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="page-container min-h-screen">
+    <div className="page-container pb-24">
       {/* Profile header */}
       <div className="flex flex-col items-center mb-8 animate-fade-in">
         <div className="w-20 h-20 rounded-full bg-neon-green/20 border-2 border-neon-green/40 flex items-center justify-center mb-3">
@@ -213,6 +246,20 @@ export default function ProfilePage() {
                 Send Password Reset Email
               </button>
             </div>
+
+            {/* PWA Installation */}
+            {!isInstalled && (isInstallable || isIOS) && (
+              <div className="border-t border-gym-border/40 pt-4 mt-1">
+                <button
+                  type="button"
+                  onClick={installApp}
+                  className="w-full py-2 bg-neon-green/10 border border-neon-green/30 text-neon-green hover:bg-neon-green/20 text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all"
+                >
+                  <Download className="w-3.5 h-3.5 animate-pulse" />
+                  Install NoteFit App
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -220,10 +267,64 @@ export default function ProfilePage() {
       {/* Logout */}
       <button
         onClick={handleLogout}
-        className="w-full py-3 rounded-xl border border-destructive/30 text-destructive hover:bg-destructive/10 flex items-center justify-center gap-2 text-sm font-medium transition-all animate-fade-in mb-6"
+        className="w-full py-3 rounded-xl border border-destructive/30 text-destructive hover:bg-destructive/10 flex items-center justify-center gap-2 text-sm font-medium transition-all animate-fade-in mb-4"
       >
         <LogOut className="w-4 h-4" /> Sign Out
       </button>
+
+      {/* Danger Zone */}
+      <div className="glass-card p-4 border-destructive/20 mb-12 animate-fade-in">
+        <h3 className="font-semibold text-sm text-destructive mb-2">Danger Zone</h3>
+        <p className="text-xs text-muted-foreground mb-4">
+          Deleting your account will permanently remove your profile, workouts, history, tasks, and notes from our database. This action is irreversible.
+        </p>
+        
+        {confirmDelete ? (
+          <div className="flex flex-col gap-2 animate-slide-up">
+            <p className="text-[10px] text-destructive font-black tracking-wider uppercase">
+              ⚠️ Are you absolutely sure? Type your email to confirm deletion:
+            </p>
+            <input
+              type="text"
+              value={confirmEmail}
+              onChange={(e) => setConfirmEmail(e.target.value)}
+              placeholder={profile?.email || user?.email || ""}
+              className="w-full px-4 py-2.5 bg-gym-black border border-destructive/30 rounded-xl text-sm focus:outline-none focus:border-destructive text-foreground placeholder:text-muted-foreground/45"
+            />
+            <div className="flex gap-2 mt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmDelete(false);
+                  setConfirmEmail("");
+                }}
+                className="flex-1 py-2 rounded-xl border border-gym-border text-muted-foreground text-xs font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteAccount}
+                disabled={deleting || confirmEmail !== (profile?.email || user?.email)}
+                className="flex-1 py-2 bg-destructive/20 border border-destructive/40 text-destructive hover:bg-destructive/35 disabled:opacity-40 disabled:hover:bg-destructive/20 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5"
+              >
+                {deleting ? (
+                  <div className="w-3.5 h-3.5 border border-destructive/30 border-t-destructive rounded-full animate-spin" />
+                ) : (
+                  "Delete My Account"
+                )}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setConfirmDelete(true)}
+            className="w-full py-2.5 rounded-xl border border-destructive/30 text-destructive hover:bg-destructive/10 flex items-center justify-center gap-2 text-xs font-bold transition-all"
+          >
+            Delete Account
+          </button>
+        )}
+      </div>
     </div>
   );
 }

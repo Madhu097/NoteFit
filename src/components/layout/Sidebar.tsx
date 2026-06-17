@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/providers/AuthProvider";
+import { usePWA } from "@/providers/PWAProvider";
 import { logOut } from "@/lib/firebase/auth";
 import { useRouter } from "next/navigation";
 import {
   Home, Dumbbell, Calendar, TrendingUp, User,
   ClipboardList, StickyNote, LogOut, Zap, BookOpen, CheckSquare,
-  ShieldAlert
+  ShieldAlert, Download
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -28,6 +29,7 @@ const NAV_ITEMS = [
 export default function Sidebar() {
   const pathname = usePathname();
   const { user, profile } = useAuth();
+  const { isInstallable, installApp } = usePWA();
   const router = useRouter();
 
   const handleLogout = async () => {
@@ -94,6 +96,17 @@ export default function Sidebar() {
             <p className="text-muted-foreground text-xs truncate">{profile?.email || user?.email}</p>
           </div>
         </div>
+        
+        {isInstallable && (
+          <button
+            onClick={installApp}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 mb-2 rounded-xl text-sm text-neon-green bg-neon-green/10 border border-neon-green/20 hover:bg-neon-green/20 transition-all duration-200 font-semibold"
+          >
+            <Download className="w-4 h-4 animate-bounce" />
+            Install NoteFit App
+          </button>
+        )}
+
         <button
           onClick={handleLogout}
           className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all duration-200"

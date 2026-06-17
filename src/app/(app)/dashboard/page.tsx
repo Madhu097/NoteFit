@@ -88,24 +88,36 @@ export default function DashboardPage() {
     return calculateStreak(workouts, profile.restDays ?? ["Sunday"]);
   }, [workouts, profile]);
 
-  const weeklyWorkouts = useMemo(() => {
+  const weeklyWorkedDays = useMemo(() => {
     const now = new Date();
     const start = startOfWeek(now, { weekStartsOn: 1 });
     const end = endOfWeek(now, { weekStartsOn: 1 });
-    return workouts.filter((w) =>
-      isWithinInterval(toDate(w.date), { start, end })
+    const thisWeek = workouts.filter((w) =>
+      w.duration > 0 && isWithinInterval(toDate(w.date), { start, end })
     );
+    const days = new Set<number>();
+    thisWeek.forEach((w) => {
+      const date = toDate(w.date);
+      const day = date.getDay();
+      const isoDay = day === 0 ? 6 : day - 1; // Map Sunday (0) -> 6, Monday (1) -> 0, etc.
+      days.add(isoDay);
+    });
+    return days;
   }, [workouts]);
 
   const recentWorkouts = workouts.slice(0, 4);
   const pendingTasks = tasks.filter((t) => t.status === "pending").slice(0, 3);
-  const todayWorkout = weeklyWorkouts.find((w) => {
-    const d = toDate(w.date);
-    d.setHours(0, 0, 0, 0);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return d.getTime() === today.getTime();
-  });
+  
+  const todayWorkout = useMemo(() => {
+    return workouts.find((w) => {
+      if (w.duration > 0) return false; // Ignore finished workouts
+      const d = toDate(w.date);
+      d.setHours(0, 0, 0, 0);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return d.getTime() === today.getTime();
+    });
+  }, [workouts]);
 
   const freq = profile?.workoutFrequency ?? 4;
 
@@ -222,7 +234,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="page-container min-h-screen pb-16">
+    <div className="page-container pb-24">
       {/* Header greeting */}
       <div className="mb-6 animate-fade-in flex items-center justify-between">
         <div>
@@ -400,7 +412,7 @@ export default function DashboardPage() {
       </div>
 
       {/* START WORKOUT CTA */}
-      <Link href="/workout" className="block mb-6 animate-slide-up">
+      <Link href={todayWorkout ? `/workout/session?id=${todayWorkout.id}` : "/workout"} className="block mb-6 animate-slide-up">
         <div className="relative overflow-hidden rounded-2xl neon-btn p-5">
           <div className="absolute inset-0 bg-gradient-to-r from-neon-green to-emerald-400 opacity-90" />
           <div className="relative flex items-center justify-between">
@@ -480,18 +492,18 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-semibold text-sm">Workouts This Week</h3>
           <span className="text-muted-foreground text-xs">
-            {weeklyWorkouts.length} / {freq} completed
+            {weeklyWorkedDays.size} / {freq} completed
           </span>
         </div>
         <div className="w-full bg-gym-muted rounded-full h-2.5 mb-3">
           <div
             className="h-full rounded-full bg-gradient-to-r from-neon-green to-emerald-400 transition-all duration-700"
-            style={{ width: `${Math.min((weeklyWorkouts.length / freq) * 100, 100)}%` }}
+            style={{ width: `${Math.min((weeklyWorkedDays.size / freq) * 100, 100)}%` }}
           />
         </div>
         <div className="grid grid-cols-7 gap-1">
           {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => {
-            const done = i < weeklyWorkouts.length;
+            const done = weeklyWorkedDays.has(i);
             return (
               <div key={i} className="flex flex-col items-center gap-1">
                 <div

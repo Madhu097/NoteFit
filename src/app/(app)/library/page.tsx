@@ -34,6 +34,7 @@ export default function LibraryPage() {
   const [icon, setIcon] = useState("💪");
   const [instructions, setInstructions] = useState("");
   const [tips, setTips] = useState("");
+  const [image, setImage] = useState("");
   const [saving, setSaving] = useState(false);
 
   const isAdmin = profile?.role === "admin" || profile?.isAdmin === true;
@@ -62,6 +63,7 @@ export default function LibraryPage() {
     setIcon("💪");
     setInstructions("");
     setTips("");
+    setImage("");
     setEditingEx(null);
     setShowAddForm(true);
   };
@@ -75,6 +77,7 @@ export default function LibraryPage() {
     setIcon(ex.icon || "💪");
     setInstructions(ex.instructions || "");
     setTips(ex.tips || "");
+    setImage(ex.image || "");
     setShowAddForm(false);
   };
 
@@ -98,6 +101,7 @@ export default function LibraryPage() {
       icon,
       instructions: instructions.trim(),
       tips: tips.trim(),
+      image: image.trim() || undefined,
     };
 
     try {
@@ -143,8 +147,26 @@ export default function LibraryPage() {
     });
   }, [exercises, search, category]);
 
+  const groupedExercises = useMemo(() => {
+    const groups: Record<string, LibraryExercise[]> = {};
+    filtered.forEach((ex) => {
+      const muscle = ex.primaryMuscle;
+      if (!groups[muscle]) {
+        groups[muscle] = [];
+      }
+      groups[muscle].push(ex);
+    });
+    // Sort keys alphabetically so it reads nicely
+    return Object.keys(groups)
+      .sort()
+      .reduce<Record<string, LibraryExercise[]>>((acc, key) => {
+        acc[key] = groups[key];
+        return acc;
+      }, {});
+  }, [filtered]);
+
   return (
-    <div className="page-container min-h-screen pb-16">
+    <div className="page-container pb-24">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -259,6 +281,16 @@ export default function LibraryPage() {
               />
             </div>
 
+            <div>
+              <label className="text-[10px] text-muted-foreground mb-0.5 block font-semibold">IMAGE PATH / URL</label>
+              <input
+                value={image}
+                onChange={(e) => setImage(e.target.value)}
+                placeholder="e.g. /images/bench_press.png"
+                className="w-full px-3 py-2 bg-gym-charcoal border border-gym-border rounded-lg text-xs text-foreground focus:outline-none focus:border-neon-green/50"
+              />
+            </div>
+
             <div className="flex gap-2 mt-2">
               <button
                 type="button"
@@ -328,80 +360,107 @@ export default function LibraryPage() {
         </div>
       ) : (
         <>
-          <p className="text-muted-foreground text-xs mb-3">{filtered.length} exercises</p>
-          <div className="flex flex-col gap-2">
-            {filtered.map((ex) => {
-              const isOpen = expanded === ex.name;
-              return (
-                <div key={ex.id || ex.name} className="glass-card overflow-hidden transition-all duration-200">
-                  <div
-                    onClick={() => setExpanded(isOpen ? null : ex.name)}
-                    className="w-full px-4 py-3 flex items-center gap-3 text-left cursor-pointer"
-                  >
-                    <div className="w-10 h-10 rounded-xl bg-neon-green/10 flex items-center justify-center text-xl flex-none">
-                      {ex.icon || "💪"}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm">{ex.name}</p>
-                      <p className="text-muted-foreground text-xs">
-                        {ex.primaryMuscle} · {ex.category}
-                      </p>
-                    </div>
-                    
-                    <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                      {isAdmin && (
-                        <>
-                          <button
-                            onClick={() => handleOpenEditForm(ex)}
-                            className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-neon-green hover:bg-neon-green/10 transition-all"
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={(e) => ex.id && handleDelete(ex.id, e)}
-                            className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </>
-                      )}
-                      <ChevronRight className={cn("w-4 h-4 text-muted-foreground transition-transform", isOpen && "rotate-90")} />
-                    </div>
-                  </div>
-
-                  {isOpen && (
-                    <div className="px-4 pb-4 animate-fade-in">
-                      <div className="border-t border-gym-border pt-3 flex flex-col gap-3">
-                        {/* Muscles */}
-                        <div>
-                          <p className="text-[10px] text-muted-foreground font-semibold mb-1.5 tracking-wider">MUSCLES</p>
-                          <div className="flex flex-wrap gap-1.5">
-                            <span className="badge-green text-[10px]">{ex.primaryMuscle}</span>
-                            {ex.secondaryMuscles?.map((m) => (
-                              <span key={m} className="badge-blue text-[10px]">{m}</span>
-                            ))}
+          <p className="text-muted-foreground text-xs mb-3">{filtered.length} exercises found</p>
+          <div className="space-y-6">
+            {Object.entries(groupedExercises).map(([muscleGroup, groupList]) => (
+              <div key={muscleGroup} className="space-y-2.5 animate-fade-in">
+                <h3 className="flex items-center gap-2 border-l-2 border-neon-green pl-2.5 py-0.5 text-neon-green/90 font-black text-xs tracking-wider mb-2 uppercase">
+                  <span>{muscleGroup}</span>
+                  <span className="text-[9px] bg-neon-green/10 border border-neon-green/20 px-1.5 py-0.5 rounded text-neon-green font-bold">
+                    {groupList.length}
+                  </span>
+                </h3>
+                
+                <div className="flex flex-col gap-2">
+                  {groupList.map((ex) => {
+                    const isOpen = expanded === ex.name;
+                    return (
+                      <div key={ex.id || ex.name} className="glass-card overflow-hidden transition-all duration-200">
+                        <div
+                          onClick={() => setExpanded(isOpen ? null : ex.name)}
+                          className="w-full px-4 py-3 flex items-center gap-3 text-left cursor-pointer"
+                        >
+                          <div className="w-10 h-10 rounded-xl bg-neon-green/10 flex items-center justify-center text-xl flex-none">
+                            {ex.icon || "💪"}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm">{ex.name}</p>
+                            <p className="text-muted-foreground text-xs">
+                              {ex.primaryMuscle} · {ex.category}
+                            </p>
+                          </div>
+                          
+                          <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                            {isAdmin && (
+                              <>
+                                <button
+                                  onClick={() => handleOpenEditForm(ex)}
+                                  className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-neon-green hover:bg-neon-green/10 transition-all"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={(e) => ex.id && handleDelete(ex.id, e)}
+                                  className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </>
+                            )}
+                            <ChevronRight className={cn("w-4 h-4 text-muted-foreground transition-transform", isOpen && "rotate-90")} />
                           </div>
                         </div>
-                        {/* Instructions */}
-                        {ex.instructions && (
-                          <div>
-                            <p className="text-[10px] text-muted-foreground font-semibold mb-1 tracking-wider">INSTRUCTIONS</p>
-                            <p className="text-xs text-foreground/80 leading-relaxed">{ex.instructions}</p>
-                          </div>
-                        )}
-                        {/* Tips */}
-                        {ex.tips && (
-                          <div className="bg-pr-gold/5 border border-pr-gold/20 rounded-xl px-3 py-2">
-                            <p className="text-[10px] text-pr-gold font-semibold mb-0.5 tracking-wider">💡 TIP</p>
-                            <p className="text-xs text-foreground/75 leading-relaxed">{ex.tips}</p>
+
+                        {isOpen && (
+                          <div className="px-4 pb-4 animate-fade-in">
+                            <div className="border-t border-gym-border pt-3 flex flex-col sm:grid sm:grid-cols-2 sm:gap-4 gap-3">
+                              <div className="flex flex-col gap-3">
+                                {/* Muscles */}
+                                <div>
+                                  <p className="text-[10px] text-muted-foreground font-semibold mb-1.5 tracking-wider">TARGET MUSCLES</p>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    <span className="badge-green text-[10px]">Primary: {ex.primaryMuscle}</span>
+                                    {ex.secondaryMuscles?.map((m) => (
+                                      <span key={m} className="badge-blue text-[10px]">{m}</span>
+                                    ))}
+                                  </div>
+                                </div>
+                                {/* Instructions */}
+                                {ex.instructions && (
+                                  <div>
+                                    <p className="text-[10px] text-muted-foreground font-semibold mb-1 tracking-wider">HOW TO DO IT</p>
+                                    <p className="text-xs text-foreground/80 leading-relaxed whitespace-pre-line">{ex.instructions}</p>
+                                  </div>
+                                )}
+                                {/* Tips */}
+                                {ex.tips && (
+                                  <div className="bg-pr-gold/5 border border-pr-gold/20 rounded-xl px-3 py-2">
+                                    <p className="text-[10px] text-pr-gold font-semibold mb-0.5 tracking-wider">💡 COACH TIP</p>
+                                    <p className="text-xs text-foreground/75 leading-relaxed">{ex.tips}</p>
+                                  </div>
+                                )}
+                              </div>
+                              
+                              {/* Illustration Image */}
+                              {ex.image && (
+                                <div className="relative w-full h-48 sm:h-auto min-h-[180px] rounded-xl overflow-hidden border border-gym-border bg-gym-card/40 flex items-center justify-center p-2 self-stretch">
+                                  <img
+                                    src={ex.image}
+                                    alt={ex.name}
+                                    className="object-contain w-full h-full max-h-[180px] sm:max-h-[220px] hover:scale-[1.05] transition-transform duration-300"
+                                    loading="lazy"
+                                  />
+                                </div>
+                              )}
+                            </div>
                           </div>
                         )}
                       </div>
-                    </div>
-                  )}
+                    );
+                  })}
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         </>
       )}

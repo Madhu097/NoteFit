@@ -4,8 +4,10 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
-  getDocs,
-  getDoc,
+  getDocs as firebaseGetDocs,
+  getDoc as firebaseGetDoc,
+  getDocsFromCache,
+  getDocFromCache,
   query,
   where,
   orderBy,
@@ -13,6 +15,54 @@ import {
   Timestamp,
   serverTimestamp,
 } from "firebase/firestore";
+
+const getDocs = async (q: any): Promise<any> => {
+  const isOffline = typeof window !== "undefined" && !window.navigator.onLine;
+  if (isOffline) {
+    try {
+      return await getDocsFromCache(q);
+    } catch (err) {
+      console.warn("Offline cache fetch failed, returning empty snapshot:", err);
+      return { empty: true, docs: [] };
+    }
+  }
+  
+  try {
+    return await firebaseGetDocs(q);
+  } catch (err) {
+    console.warn("Online fetch failed, trying cache:", err);
+    try {
+      return await getDocsFromCache(q);
+    } catch (cacheErr) {
+      console.warn("Cache fallback failed, returning empty snapshot:", cacheErr);
+      return { empty: true, docs: [] };
+    }
+  }
+};
+
+const getDoc = async (docRef: any): Promise<any> => {
+  const isOffline = typeof window !== "undefined" && !window.navigator.onLine;
+  if (isOffline) {
+    try {
+      return await getDocFromCache(docRef);
+    } catch (err) {
+      console.warn("Offline single document fetch failed, returning empty document:", err);
+      return { exists: () => false, data: () => undefined, id: docRef.id };
+    }
+  }
+  
+  try {
+    return await firebaseGetDoc(docRef);
+  } catch (err) {
+    console.warn("Online single document fetch failed, trying cache:", err);
+    try {
+      return await getDocFromCache(docRef);
+    } catch (cacheErr) {
+      console.warn("Cache fallback for single document failed, returning empty document:", cacheErr);
+      return { exists: () => false, data: () => undefined, id: docRef.id };
+    }
+  }
+};
 import { db, isMock } from "./config";
 import { Workout, Exercise, WorkoutSplit } from "@/types/workout";
 import { Note } from "@/types/note";
@@ -491,51 +541,76 @@ export interface LibraryExercise {
   icon: string;
   instructions: string;
   tips: string;
+  image?: string;
 }
 
 const SEED_EXERCISES: Omit<LibraryExercise, "id">[] = [
-  { name: "Bench Press", primaryMuscle: "Chest", secondaryMuscles: ["Triceps", "Front Delts"], category: "Push", icon: "💪", instructions: "Lie flat, grip bar slightly wider than shoulder-width, lower to chest, press up explosively.", tips: "Keep shoulder blades retracted and feet flat on floor." },
-  { name: "Incline Dumbbell Press", primaryMuscle: "Upper Chest", secondaryMuscles: ["Triceps", "Shoulders"], category: "Push", icon: "🏋️", instructions: "Set bench to 30-45°, press dumbbells from shoulder level to full extension.", tips: "Control the descent. Don't let elbows flare too wide." },
-  { name: "Shoulder Press", primaryMuscle: "Shoulders", secondaryMuscles: ["Triceps", "Upper Chest"], category: "Push", icon: "⬆️", instructions: "Press barbell or dumbbells from shoulder level overhead until arms are fully extended.", tips: "Avoid arching your lower back. Engage core." },
-  { name: "Lateral Raises", primaryMuscle: "Side Delts", secondaryMuscles: ["Traps"], category: "Push", icon: "🦅", instructions: "Raise dumbbells to the side until parallel to the floor, slight bend in elbows.", tips: "Lead with your elbows. Control the negative." },
-  { name: "Tricep Pushdowns", primaryMuscle: "Triceps", secondaryMuscles: [], category: "Push", icon: "⬇️", instructions: "Keep elbows fixed at sides, push cable bar down until arms are fully extended.", tips: "Full extension at bottom for peak contraction." },
-  { name: "Deadlift", primaryMuscle: "Hamstrings", secondaryMuscles: ["Glutes", "Lower Back", "Traps", "Lats"], category: "Pull", icon: "🏋️", instructions: "Hip-width stance, bar over mid-foot, hinge hips back, pull bar along legs.", tips: "Push the floor away instead of pulling up. Neutral spine." },
-  { name: "Lat Pulldown", primaryMuscle: "Lats", secondaryMuscles: ["Biceps", "Rear Delts"], category: "Pull", icon: "🔽", instructions: "Grip bar wider than shoulder-width, pull to upper chest, squeeze lats at bottom.", tips: "Lean back slightly. Drive elbows down and back." },
-  { name: "Barbell Row", primaryMuscle: "Mid Back", secondaryMuscles: ["Lats", "Biceps", "Rear Delts"], category: "Pull", icon: "🔙", instructions: "Hip hinge position, pull bar to lower chest/upper abdomen, retract shoulder blades.", tips: "Keep back parallel to floor. Squeeze at top." },
-  { name: "Bicep Curls", primaryMuscle: "Biceps", secondaryMuscles: ["Forearms"], category: "Pull", icon: "💪", instructions: "Stand with dumbbells, curl with supination, squeeze at top, lower slowly.", tips: "Keep elbows pinned to sides. Full range of motion." },
-  { name: "Squat", primaryMuscle: "Quads", secondaryMuscles: ["Glutes", "Hamstrings", "Core"], category: "Legs", icon: "🦵", instructions: "Bar on upper traps, feet shoulder-width, squat until thighs parallel, drive through heels.", tips: "Knees track over toes. Chest up. Depth matters." },
-  { name: "Romanian Deadlift", primaryMuscle: "Hamstrings", secondaryMuscles: ["Glutes", "Lower Back"], category: "Legs", icon: "🦵", instructions: "Stand with bar, hinge at hips while keeping slight knee bend, lower until hamstring stretch.", tips: "Push hips back, not down. Feel the hamstring stretch." },
-  { name: "Leg Press", primaryMuscle: "Quads", secondaryMuscles: ["Glutes", "Hamstrings"], category: "Legs", icon: "🦿", instructions: "Feet shoulder-width on platform, lower until 90°, press through heels.", tips: "Don't lock out knees at top. Full range beats heavy weight." },
-  { name: "Hip Thrust", primaryMuscle: "Glutes", secondaryMuscles: ["Hamstrings", "Core"], category: "Legs", icon: "🍑", instructions: "Upper back on bench, bar on hips, drive through heels to full hip extension.", tips: "Posterior pelvic tilt at top. Squeeze glutes hard." },
-  { name: "Calf Raises", primaryMuscle: "Calves", secondaryMuscles: [], category: "Legs", icon: "🦶", instructions: "Stand on edge of step, rise on toes fully, lower below platform level.", tips: "Full range of motion. Pause at top and bottom." },
-  { name: "Pull-ups", primaryMuscle: "Lats", secondaryMuscles: ["Biceps", "Rear Delts", "Core"], category: "Pull", icon: "🤸", instructions: "Hang from bar, pull until chin above bar, lower with control.", tips: "Dead hang at bottom. No kipping for strength." },
-  { name: "Plank", primaryMuscle: "Core", secondaryMuscles: ["Shoulders", "Glutes"], category: "Core", icon: "🧘", instructions: "Forearms on floor, body in straight line from head to heels.", tips: "Don't let hips sag or pike. Squeeze everything." },
+  { name: "Bench Press", primaryMuscle: "Chest", secondaryMuscles: ["Triceps", "Front Delts"], category: "Push", icon: "💪", instructions: "Lie flat, grip bar slightly wider than shoulder-width, lower to chest, press up explosively.", tips: "Keep shoulder blades retracted and feet flat on floor.", image: "/images/bench_press.png" },
+  { name: "Incline Dumbbell Press", primaryMuscle: "Upper Chest", secondaryMuscles: ["Triceps", "Shoulders"], category: "Push", icon: "🏋️", instructions: "Set bench to 30-45°, press dumbbells from shoulder level to full extension.", tips: "Control the descent. Don't let elbows flare too wide.", image: "/images/incline_dumbbell_press.png" },
+  { name: "Shoulder Press", primaryMuscle: "Shoulders", secondaryMuscles: ["Triceps", "Upper Chest"], category: "Push", icon: "⬆️", instructions: "Press barbell or dumbbells from shoulder level overhead until arms are fully extended.", tips: "Avoid arching your lower back. Engage core.", image: "/images/shoulder_press.png" },
+  { name: "Lateral Raises", primaryMuscle: "Side Delts", secondaryMuscles: ["Traps"], category: "Push", icon: "🦅", instructions: "Raise dumbbells to the side until parallel to the floor, slight bend in elbows.", tips: "Lead with your elbows. Control the negative.", image: "/images/lateral_raises.png" },
+  { name: "Tricep Pushdowns", primaryMuscle: "Triceps", secondaryMuscles: [], category: "Push", icon: "⬇️", instructions: "Keep elbows fixed at sides, push cable bar down until arms are fully extended.", tips: "Full extension at bottom for peak contraction.", image: "/images/tricep_pushdowns.png" },
+  { name: "Deadlift", primaryMuscle: "Hamstrings", secondaryMuscles: ["Glutes", "Lower Back", "Traps", "Lats"], category: "Pull", icon: "🏋️", instructions: "Hip-width stance, bar over mid-foot, hinge hips back, pull bar along legs.", tips: "Push the floor away instead of pulling up. Neutral spine.", image: "/images/deadlift.png" },
+  { name: "Lat Pulldown", primaryMuscle: "Lats", secondaryMuscles: ["Biceps", "Rear Delts"], category: "Pull", icon: "🔽", instructions: "Grip bar wider than shoulder-width, pull to upper chest, squeeze lats at bottom.", tips: "Lean back slightly. Drive elbows down and back.", image: "/images/lat_pulldown.png" },
+  { name: "Barbell Row", primaryMuscle: "Mid Back", secondaryMuscles: ["Lats", "Biceps", "Rear Delts"], category: "Pull", icon: "🔙", instructions: "Hip hinge position, pull bar to lower chest/upper abdomen, retract shoulder blades.", tips: "Keep back parallel to floor. Squeeze at top.", image: "/images/barbell_row.png" },
+  { name: "Bicep Curls", primaryMuscle: "Biceps", secondaryMuscles: ["Forearms"], category: "Pull", icon: "💪", instructions: "Stand with dumbbells, curl with supination, squeeze at top, lower slowly.", tips: "Keep elbows pinned to sides. Full range of motion.", image: "/images/bicep_curls.png" },
+  { name: "Squat", primaryMuscle: "Quads", secondaryMuscles: ["Glutes", "Hamstrings", "Core"], category: "Legs", icon: "🦵", instructions: "Bar on upper traps, feet shoulder-width, squat until thighs parallel, drive through heels.", tips: "Knees track over toes. Chest up. Depth matters.", image: "/images/squats.png" },
+  { name: "Romanian Deadlift", primaryMuscle: "Hamstrings", secondaryMuscles: ["Glutes", "Lower Back"], category: "Legs", icon: "🦵", instructions: "Stand with bar, hinge at hips while keeping slight knee bend, lower until hamstring stretch.", tips: "Push hips back, not down. Feel the hamstring stretch.", image: "/images/romanian_deadlift.png" },
+  { name: "Leg Press", primaryMuscle: "Quads", secondaryMuscles: ["Glutes", "Hamstrings"], category: "Legs", icon: "🦿", instructions: "Feet shoulder-width on platform, lower until 90°, press through heels.", tips: "Don't lock out knees at top. Full range beats heavy weight.", image: "/images/leg_press.png" },
+  { name: "Hip Thrust", primaryMuscle: "Glutes", secondaryMuscles: ["Hamstrings", "Core"], category: "Legs", icon: "🍑", instructions: "Upper back on bench, bar on hips, drive through heels to full hip extension.", tips: "Posterior pelvic tilt at top. Squeeze glutes hard.", image: "/images/hip_thrust.png" },
+  { name: "Calf Raises", primaryMuscle: "Calves", secondaryMuscles: [], category: "Legs", icon: "🦶", instructions: "Stand on edge of step, rise on toes fully, lower below platform level.", tips: "Full range of motion. Pause at top and bottom.", image: "/images/calf_raises.png" },
+  { name: "Pull-ups", primaryMuscle: "Lats", secondaryMuscles: ["Biceps", "Rear Delts", "Core"], category: "Pull", icon: "🤸", instructions: "Hang from bar, pull until chin above bar, lower with control.", tips: "Dead hang at bottom. No kipping for strength.", image: "/images/pull_ups.png" },
+  { name: "Plank", primaryMuscle: "Core", secondaryMuscles: ["Shoulders", "Glutes"], category: "Core", icon: "🧘", instructions: "Forearms on floor, body in straight line from head to heels.", tips: "Don't let hips sag or pike. Squeeze everything.", image: "/images/plank.png" },
 ];
 
 export const getLibraryExercises = async (): Promise<LibraryExercise[]> => {
+  let list: LibraryExercise[] = [];
+
   if (isMock) {
-    let list = getLocalStorageItem<LibraryExercise[]>("notfit_mock_library", []);
-    if (!list || list.length === 0) {
-      list = SEED_EXERCISES.map((ex, i) => ({
+    let cached = getLocalStorageItem<LibraryExercise[]>("notfit_mock_library", []);
+    if (!cached || cached.length === 0) {
+      cached = SEED_EXERCISES.map((ex, i) => ({
         id: `lib_${i}`,
         ...ex,
       }));
-      setLocalStorageItem("notfit_mock_library", list);
+      setLocalStorageItem("notfit_mock_library", cached);
     }
-    return list;
+    list = cached;
+  } else {
+    try {
+      const snap = await getDocs(collection(db, "library"));
+      if (snap.empty) {
+        const created: LibraryExercise[] = [];
+        for (const ex of SEED_EXERCISES) {
+          const ref = await addDoc(collection(db, "library"), ex);
+          created.push({ id: ref.id, ...ex });
+        }
+        list = created;
+      } else {
+        list = snap.docs.map((d) => ({ id: d.id, ...d.data() } as LibraryExercise));
+      }
+    } catch (err) {
+      console.warn("Firestore library fetch failed (offline fallback):", err);
+      list = SEED_EXERCISES.map((ex, i) => ({
+        id: `lib_fallback_${i}`,
+        ...ex,
+      }));
+    }
   }
 
-  const snap = await getDocs(collection(db, "library"));
-  if (snap.empty) {
-    const list: LibraryExercise[] = [];
-    for (const ex of SEED_EXERCISES) {
-      const ref = await addDoc(collection(db, "library"), ex);
-      list.push({ id: ref.id, ...ex });
+  // Merge local seed configurations to guarantee image and form instructions are present
+  return list.map((ex) => {
+    const seed = SEED_EXERCISES.find((s) => s.name.toLowerCase() === ex.name.toLowerCase());
+    if (seed) {
+      return {
+        ...ex,
+        image: ex.image || seed.image,
+        instructions: ex.instructions || seed.instructions,
+        tips: ex.tips || seed.tips,
+      };
     }
-    return list;
-  }
-
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as LibraryExercise));
+    return ex;
+  });
 };
 
 export const addLibraryExercise = async (data: Omit<LibraryExercise, "id">): Promise<string> => {

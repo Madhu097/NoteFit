@@ -78,7 +78,7 @@ export function getSplitBg(split: string): string {
   return colors[split] || "bg-gray-400/10 text-gray-400 border-gray-400/20";
 }
 
-export function calculateStreak(workouts: { date: Timestamp | Date }[], restDays: string[]): number {
+export function calculateStreak(workouts: { date: Timestamp | Date; duration?: number }[], restDays: string[]): number {
   if (!workouts.length) return 0;
   const days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
   const sorted = [...workouts].sort((a, b) => toDate(b.date).getTime() - toDate(a.date).getTime());
@@ -90,6 +90,7 @@ export function calculateStreak(workouts: { date: Timestamp | Date }[], restDays
     const dayName = days[checkDate.getDay()];
     const isRestDay = restDays.includes(dayName);
     const hasWorkout = sorted.some((w) => {
+      if (w.duration === 0) return false; // Ignore active/uncompleted workouts
       const d = toDate(w.date);
       d.setHours(0, 0, 0, 0);
       return d.getTime() === checkDate.getTime();

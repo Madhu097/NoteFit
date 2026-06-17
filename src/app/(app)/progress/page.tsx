@@ -11,10 +11,11 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, BarChart, Bar, Legend
 } from "recharts";
-import { TrendingUp, Scale, Dumbbell, Plus, X, Trophy } from "lucide-react";
+import { TrendingUp, Scale, Dumbbell, Plus, X, Trophy, Edit3, Trash2, Check } from "lucide-react";
 import { toDate, formatVolume } from "@/lib/utils";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
@@ -34,10 +35,33 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 export default function ProgressPage() {
   const { profile } = useAuth();
-  const { progress, loading, logProgress } = useProgress();
+  const { progress, loading, logProgress, editProgress, removeProgress } = useProgress();
   const { workouts } = useWorkouts();
   const [showForm, setShowForm] = useState(false);
   const [tab, setTab] = useState<"weight" | "volume" | "records">("weight");
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editWeight, setEditWeight] = useState("");
+
+  const handleStartEdit = (p: any) => {
+    setEditingId(p.id);
+    setEditWeight(String(p.weight || ""));
+  };
+
+  const handleSaveEdit = async (id: string) => {
+    if (!editWeight || isNaN(Number(editWeight)) || Number(editWeight) <= 0) {
+      toast.error("Please enter a valid weight");
+      return;
+    }
+    await editProgress(id, { weight: Number(editWeight) });
+    setEditingId(null);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (confirm("Are you sure you want to delete this weight log?")) {
+      await removeProgress(id);
+    }
+  };
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<ProgressInput>({
     resolver: zodResolver(progressSchema),
@@ -264,9 +288,60 @@ export default function ProgressPage() {
               <h3 className="section-heading">Weight History</h3>
               <div className="flex flex-col gap-2">
                 {progress.filter((p) => p.weight).slice(0, 10).map((p) => (
-                  <div key={p.id} className="glass-card px-4 py-3 flex items-center justify-between">
-                    <p className="text-sm text-muted-foreground">{format(toDate(p.date), "dd MMM yyyy")}</p>
-                    <p className="font-bold text-neon-blue">{p.weight} kg</p>
+                  <div key={p.id} className="glass-card px-4 py-3 flex items-center justify-between min-h-[52px]">
+                    {editingId === p.id ? (
+                      <div className="flex items-center justify-between gap-3 w-full animate-fade-in">
+                        <div className="flex items-center gap-2 flex-1">
+                          <input
+                            type="number"
+                            step="0.1"
+                            value={editWeight}
+                            onChange={(e) => setEditWeight(e.target.value)}
+                            className="w-24 px-2.5 py-1.5 bg-gym-charcoal border border-gym-border rounded-xl text-xs text-foreground focus:outline-none focus:border-neon-green/50"
+                          />
+                          <span className="text-xs text-muted-foreground">kg</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => p.id && handleSaveEdit(p.id)}
+                            className="w-7 h-7 rounded-lg flex items-center justify-center text-neon-green hover:bg-neon-green/10 transition-all"
+                          >
+                            <Check className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingId(null)}
+                            className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-gym-muted transition-all"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-sm text-muted-foreground">{format(toDate(p.date), "dd MMM yyyy")}</p>
+                        <div className="flex items-center gap-3">
+                          <p className="font-bold text-neon-blue">{p.weight} kg</p>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleStartEdit(p)}
+                              className="w-7.5 h-7.5 rounded-lg flex items-center justify-center text-muted-foreground hover:text-neon-green hover:bg-neon-green/10 transition-all"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => p.id && handleDelete(p.id)}
+                              className="w-7.5 h-7.5 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 ))}
               </div>
