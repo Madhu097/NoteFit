@@ -44,7 +44,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0A0A0B",
+  themeColor: "#0A0A0A",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -58,7 +58,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`dark ${inter.variable} ${poppins.variable}`}>
-      <body className="bg-gym-black text-foreground antialiased">
+      <body className="bg-background text-foreground antialiased">
         <AuthProvider>
           <PWAProvider>
             {children}
@@ -67,9 +67,11 @@ export default function RootLayout({
               position="top-center"
               toastOptions={{
                 style: {
-                  background: "hsl(240 6% 10%)",
-                  border: "1px solid hsl(240 5% 18%)",
-                  color: "hsl(0 0% 95%)",
+                  background: "#111111",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  color: "rgba(255,255,255,0.9)",
+                  borderRadius: "14px",
+                  fontSize: "14px",
                 },
               }}
             />

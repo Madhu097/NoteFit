@@ -21,10 +21,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gym-black flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-2 border-gym-border border-t-neon-green rounded-full animate-spin" />
-          <p className="text-muted-foreground text-sm">Loading NoteFit...</p>
+      <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-5">
+          <div className="relative w-12 h-12">
+            <div className="absolute inset-0 rounded-full border border-white/10" />
+            <div className="absolute inset-0 rounded-full border-t border-white/80 animate-spin" />
+          </div>
+          <p className="text-white/30 text-sm font-medium tracking-wide">Loading NoteFit</p>
         </div>
       </div>
     );
@@ -33,7 +36,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   if (!user) return null;
 
   return (
-    <div className="flex h-screen bg-gym-black overflow-hidden">
+    <div className="flex h-screen bg-[#0A0A0A] overflow-hidden">
       <Sidebar />
       <main className="flex-1 overflow-y-auto bottom-nav-padding md:pb-0">
         {children}
